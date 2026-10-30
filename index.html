@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>일본어 한자 획순 학습 - Kanji Stroke Trainer</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- HanziWriter CDN for Kanji Stroke Order Rendering & Recognition -->
+  <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
+
+  <!-- Google Fonts: Noto Sans JP & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bgCream: '#FBF6F0',
+            strokeNavy: '#1E3A5F',
+            strokeActive: '#7C93A8',
+            strokeLight: '#E2E7EC',
+            accentBrown: '#8C531B',
+            softBorder: '#EFE5DA'
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans JP', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Prevent default touch behaviors like scrolling/zoom while drawing */
+    body {
+      background-color: #FBF6F0;
+      color: #1E3A5F;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #kanji-target-container {
+      touch-action: none !important;
+      -webkit-touch-callout: none;
+    }
+
+    /* Style HanziWriter SVG strokes */
+    #kanji-target svg {
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 20px;
+      cursor: crosshair;
+    }
+
+    /* Subtle Shadow for minimalist card */
+    .kanji-card {
+      box-shadow: 0 16px 40px rgba(140, 83, 27, 0.06), 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Smooth transitions */
+    .btn-action {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-action:active {
+      transform: scale(0.96);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between font-sans antialiased text-strokeNavy">
+
+  <!-- TOP HEADER & SEARCH -->
+  <header class="w-full max-w-2xl mx-auto px-4 pt-6 pb-2">
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
+      <div class="flex items-center gap-2">
+        <span class="text-2xl font-bold tracking-tight text-accentBrown">漢字</span>
+        <h1 class="text-lg font-bold tracking-wide">일본어 한자 획순 학습</h1>
+      </div>
+      
+      <!-- Search Box -->
+      <form id="search-form" onsubmit="handleSearch(event)" class="w-full sm:w-auto flex items-center gap-2">
+        <div class="relative w-full sm:w-48">
+          <input 
+            type="text" 
+            id="kanji-input" 
+            maxlength="1" 
+            placeholder="한자 입력 (예: 心)" 
+            class="w-full px-4 py-2 text-center text-lg bg-white/80 border border-softBorder rounded-full focus:outline-none focus:ring-2 focus:ring-accentBrown/40 transition shadow-sm"
+          />
+        </div>
+        <button 
+          type="submit" 
+          class="px-4 py-2 bg-strokeNavy text-white text-sm font-medium rounded-full shadow hover:bg-opacity-90 btn-action"
+        >
+          검색
+        </button>
+      </form>
+    </div>
+
+    <!-- Quick Preset Kanji Chips -->
+    <div class="flex flex-wrap items-center justify-center gap-1.5 text-xs text-gray-600">
+      <span class="text-accentBrown font-medium mr-1">추천:</span>
+      <button onclick="loadKanji('心')" class="px-2.5 py-1 bg-white/60 hover:bg-white rounded-full border border-softBorder">心</button>
+      <button onclick="loadKanji('水')" class="px-2.5 py-1 bg-white/60 hover:bg-white rounded-full border border-softBorder">水</button>
+      <button onclick="loadKanji('木')" class="px-2.5 py-1 bg-white/60 hover:bg-white rounded-full border border-softBorder">木</button>
+      <button onclick="loadKanji('日')" class="px-2.5 py-1 bg-white/60 hover:bg-white rounded-full border border-softBorder">日</button>
+      <button onclick="loadKanji('月')" class="px-2.5 py-1 bg-white/60 hover:bg-white rounded-full border border-softBorder">月</button>
+      <button onclick="loadKanji('愛')" class="px-2.5 py-1 bg-white/60 hover:bg-white rounded-full border border-softBorder">愛</button>
+      <button onclick="loadKanji('櫻')" class="px-2.5 py-1 bg-white/60 hover:bg-white rounded-full border border-softBorder">櫻</button>
+      <button onclick="loadKanji('龍')" class="px-2.5 py-1 bg-white/60 hover:bg-white rounded-full border border-softBorder">龍</button>
+    </div>
+  </header>
+
+  <!-- MAIN KANJI PRACTICE CONTAINER -->
+  <main class="flex-1 flex flex-col items-center justify-center px-4 py-4 max-w-xl mx-auto w-full">
+    
+    <!-- KANJI INFO HEADER (Matching Reference Image) -->
+    <div class="w-full flex items-center justify-between mb-4 px-2">
+      <!-- Previous Button -->
+      <button 
+        onclick="navigateKanji(-1)" 
+        aria-label="이전 한자"
+        class="p-3 text-accentBrown hover:text-strokeNavy text-2xl font-bold transition btn-action focus:outline-none"
+      >
+        &#10094;
+      </button>
+
+      <!-- Kanji Main Meta -->
+      <div class="text-center">
+        <!-- Main Big Character -->
+        <div id="info-kanji" class="text-4xl font-bold tracking-wide mb-1 text-strokeNavy">
+          心
+        </div>
+        <!-- Reading (Onyomi/Kunyomi) -->
+        <div id="info-reading" class="text-sm font-semibold text-accentBrown mb-0.5 tracking-wider">
+          しん (xīn)
+        </div>
+        <!-- Meaning -->
+        <div id="info-meaning" class="text-xs text-gray-600 font-medium">
+          마음
+        </div>
+      </div>
+
+      <!-- Next Button -->
+      <button 
+        onclick="navigateKanji(1)" 
+        aria-label="다음 한자"
+        class="p-3 text-accentBrown hover:text-strokeNavy text-2xl font-bold transition btn-action focus:outline-none"
+      >
+        &#10095;
+      </button>
+    </div>
+
+    <!-- WRITING CANVAS CARD -->
+    <div class="relative w-full max-w-[340px] sm:max-w-[380px] aspect-square">
+      <!-- Outer White Card Box -->
+      <div 
+        id="kanji-target-container" 
+        class="w-full h-full bg-white rounded-3xl p-4 kanji-card flex items-center justify-center relative border border-white/80 overflow-hidden"
+      >
+        <!-- Canvas Background Guidelines (Crosshair Grid) -->
+        <svg class="absolute inset-0 w-full h-full pointer-events-none stroke-gray-100" stroke-width="1" stroke-dasharray="4 4">
+          <line x1="50%" y1="0" x2="50%" y2="100%" />
+          <line x1="0" y1="50%" x2="100%" y2="50%" />
+        </svg>
+
+        <!-- HanziWriter Dynamic Target Box -->
+        <div id="kanji-target" class="w-full h-full flex items-center justify-center z-10"></div>
+
+        <!-- Quiz Completion Overlay -->
+        <div 
+          id="completion-overlay" 
+          class="hidden absolute inset-0 bg-white/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-center p-6 rounded-3xl transition-all duration-300"
+        >
+          <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mb-3 shadow-inner">
+            ✓
+          </div>
+          <h3 class="text-2xl font-bold text-strokeNavy mb-1">완성했습니다!</h3>
+          <p class="text-xs text-gray-500 mb-6">획순에 맞춰 완벽하게 작성하셨습니다.</p>
+          <button 
+            onclick="resetQuiz()" 
+            class="px-6 py-2.5 bg-strokeNavy text-white font-medium rounded-full text-sm shadow-md hover:bg-opacity-90 btn-action"
+          >
+            다시 연습하기
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STROKE STATUS & CONTROLS -->
+    <div class="w-full max-w-[340px] sm:max-w-[380px] mt-5 flex flex-col items-center gap-3">
+      
+      <!-- Stroke Progress Bar -->
+      <div class="flex items-center justify-between w-full px-2 text-xs font-semibold text-gray-500">
+        <span id="stroke-status">0 / 0 획</span>
+        <span id="quiz-message" class="text-accentBrown">손가락이나 펜슬로 따라 쓰세요</span>
+      </div>
+
+      <!-- Action Buttons Row -->
+      <div class="grid grid-cols-3 gap-2 w-full">
+        <button 
+          onclick="animateKanji()" 
+          class="py-2.5 px-3 bg-white hover:bg-gray-50 border border-softBorder text-strokeNavy text-xs font-medium rounded-2xl shadow-sm text-center btn-action flex items-center justify-center gap-1.5"
+        >
+          <svg class="w-4 h-4 text-accentBrown" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          획순 보기
+        </button>
+
+        <button 
+          onclick="showHint()" 
+          class="py-2.5 px-3 bg-white hover:bg-gray-50 border border-softBorder text-strokeNavy text-xs font-medium rounded-2xl shadow-sm text-center btn-action flex items-center justify-center gap-1.5"
+        >
+          <svg class="w-4 h-4 text-accentBrown" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-0a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+          힌트 보기
+        </button>
+
+        <button 
+          onclick="resetQuiz()" 
+          class="py-2.5 px-3 bg-white hover:bg-gray-50 border border-softBorder text-strokeNavy text-xs font-medium rounded-2xl shadow-sm text-center btn-action flex items-center justify-center gap-1.5"
+        >
+          <svg class="w-4 h-4 text-accentBrown" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          다시 쓰기
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="w-full text-center py-4 text-xs text-gray-400">
+    <p>Apple Pencil · Touch Screen · Mouse Supported</p>
+  </footer>
+
+  <!-- APPLICATION LOGIC -->
+  <script>
+    // Embedded Dictionary for Common Japanese Kanji (Fallback/Offline)
+    const kanjiDict = {
+      '心': { reading: 'しん (xin)', meaning: '마음' },
+      '水': { reading: 'すい / みず', meaning: '물' },
+      '木': { reading: 'もく / き', meaning: '나무' },
+      '日': { reading: 'にち / ひ', meaning: '날 / 해' },
+      '月': { reading: 'げつ / つき', meaning: '달 / 월' },
+      '火': { reading: 'か / ひ', meaning: '불' },
+      '愛': { reading: 'あい', meaning: '사랑' },
+      '櫻': { reading: 'おう / さくら', meaning: '벚나무' },
+      '龍': { reading: 'りゅう / たつ', meaning: '용' },
+      '學': { reading: 'がく / まなぶ', meaning: '배울 학' },
+      '花': { reading: 'か / はな', meaning: '꽃' },
+      '山': { reading: 'さん / やま', meaning: '산' },
+      '川': { reading: 'せん / かわ', meaning: '강' },
+      '人': { reading: 'じん / ひと', meaning: '사람' },
+      '天': { reading: 'てん / あめ', meaning: '하늘' },
+      '空': { reading: 'くう / そら', meaning: '하늘 / 빌 공' }
+    };
+
+    const presetList = Object.keys(kanjiDict);
+    let currentKanji = '心';
+    let currentWriter = null;
+    let totalStrokes = 0;
+    let currentStrokeIndex = 0;
+
+    // Colors matching requirement & image
+    const STROKE_NAVY = '#1E3A5F';     // User finished strokes
+    const STROKE_ACTIVE = '#829BAF';   // Next stroke hint/active
+    const STROKE_LIGHT = '#E3E7EB';    // Upcoming unwritten strokes
+
+    window.onload = function() {
+      // Initialize Pointer Event Guard for Apple Pencil / Touch
+      setupPointerHandlers();
+      
+      // Load Initial Kanji
+      loadKanji(currentKanji);
+    };
+
+    /**
+     * Load & Initialize HanziWriter for given Kanji character
+     */
+    function loadKanji(char) {
+      if (!char) return;
+      currentKanji = char;
+
+      // Update Header Metadata
+      document.getElementById('info-kanji').innerText = char;
+      const dictInfo = kanjiDict[char] || { reading: 'かんじ', meaning: '일본어 한자' };
+      document.getElementById('info-reading').innerText = dictInfo.reading;
+      document.getElementById('info-meaning').innerText = dictInfo.meaning;
+
+      // Hide completion overlay if open
+      document.getElementById('completion-overlay').classList.add('hidden');
+
+      // Clear previous instance
+      document.getElementById('kanji-target').innerHTML = '';
+
+      // Create HanziWriter instance
+      currentWriter = HanziWriter.create('kanji-target', char, {
+        width: 320,
+        height: 320,
+        padding: 15,
+        showOutline: true,
+        strokeAnimationSpeed: 1.2,
+        delayBetweenStrokes: 150,
+        
+        // Exact Color Schema
+        strokeColor: STROKE_NAVY,
+        outlineColor: STROKE_LIGHT,
+        highlightColor: STROKE_ACTIVE,
+        drawingColor: STROKE_NAVY,
+        drawingWidth: 16,
+
+        // Quiz feedback tuning
+        acceptBackstrokes: true,
+        showHintAfterMisses: 2
+      });
+
+      // Fetch character data to get total stroke count
+      currentWriter.getCharacterData().then(data => {
+        totalStrokes = data.strokes.length;
+        currentStrokeIndex = 0;
+        updateStrokeStatus();
+        startQuizMode();
+      }).catch(err => {
+        console.error("Failed to load stroke data for:", char, err);
+        document.getElementById('quiz-message').innerText = "획순 데이터를 불러올 수 없습니다.";
+      });
+    }
+
+    /**
+     * Start/Restart Quiz Mode
+     */
+    function startQuizMode() {
+      if (!currentWriter) return;
+      
+      document.getElementById('completion-overlay').classList.add('hidden');
+      document.getElementById('quiz-message').innerText = "손가락이나 펜슬로 따라 쓰세요";
+      document.getElementById('quiz-message').className = "text-accentBrown";
+
+      currentWriter.quiz({
+        onCorrectStroke: function(strokeData) {
+          currentStrokeIndex = strokeData.strokeNum + 1;
+          updateStrokeStatus();
+          document.getElementById('quiz-message').innerText = "잘하셨습니다!";
+          document.getElementById('quiz-message').className = "text-emerald-600 font-semibold";
+        },
+        onMistake: function(strokeData) {
+          document.getElementById('quiz-message').innerText = "획순을 다시 확인해 보세요";
+          document.getElementById('quiz-message').className = "text-rose-500 font-semibold";
+        },
+        onComplete: function(summary) {
+          currentStrokeIndex = totalStrokes;
+          updateStrokeStatus();
+          showCompletionScreen();
+        }
+      });
+    }
+
+    /**
+     * Animate Stroke Order
+     */
+    function animateKanji() {
+      if (!currentWriter) return;
+      currentWriter.animateCharacter({
+        onComplete: function() {
+          setTimeout(startQuizMode, 1000);
+        }
+      });
+    }
+
+    /**
+     * Show Hint for Current Stroke
+     */
+    function showHint() {
+      if (!currentWriter) return;
+      currentWriter.highlightStroke(currentStrokeIndex);
+    }
+
+    /**
+     * Reset Current Quiz
+     */
+    function resetQuiz() {
+      if (!currentWriter) return;
+      currentStrokeIndex = 0;
+      updateStrokeStatus();
+      startQuizMode();
+    }
+
+    /**
+     * Update Stroke Counter display
+     */
+    function updateStrokeStatus() {
+      document.getElementById('stroke-status').innerText = `${currentStrokeIndex} / ${totalStrokes} 획`;
+    }
+
+    /**
+     * Show Completion Overlay
+     */
+    function showCompletionScreen() {
+      document.getElementById('completion-overlay').classList.remove('hidden');
+    }
+
+    /**
+     * Navigate between preset Kanji
+     */
+    function navigateKanji(direction) {
+      let currentIndex = presetList.indexOf(currentKanji);
+      if (currentIndex === -1) {
+        currentKanji = presetList[0];
+      } else {
+        let nextIndex = (currentIndex + direction + presetList.length) % presetList.length;
+        currentKanji = presetList[nextIndex];
+      }
+      loadKanji(currentKanji);
+    }
+
+    /**
+     * Handle Search Input Submission
+     */
+    function handleSearch(e) {
+      e.preventDefault();
+      const input = document.getElementById('kanji-input');
+      const val = input.value.trim();
+      if (val) {
+        loadKanji(val[0]);
+        input.value = '';
+        input.blur();
+      }
+    }
+
+    /**
+     * Stylus & Touch Palm Rejection setup via Pointer Events
+     */
+    function setupPointerHandlers() {
+      const container = document.getElementById('kanji-target-container');
+      
+      // Prevent browser native swipe-back / page gestures on iPad & Android
+      container.addEventListener('pointerdown', function(e) {
+        // Allow primary pointer (mouse / single stylus / finger)
+        if (!e.isPrimary) {
+          e.preventDefault();
+          return;
+        }
+      }, { passive: false });
+
+      container.addEventListener('touchmove', function(e) {
+        e.preventDefault(); // Lock viewport scrolling while handwriting
+      }, { passive: false });
+    }
+  </script>
+</body>
+</html>
